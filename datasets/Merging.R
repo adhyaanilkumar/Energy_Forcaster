@@ -73,3 +73,4 @@ if (length(data_list) > 0) {
 } else {
   cat("No datasets could be merged due to missing 'country' or 'year' columns.\n")
 }
+

@@ -1,0 +1,5 @@
+"Model","RMSE"
+"ARIMA",594.949249279499
+"Exponential Smoothing",604.048313244497
+"Random Forest",1126.67877109673
+"XGBoost",1453.72701148541
