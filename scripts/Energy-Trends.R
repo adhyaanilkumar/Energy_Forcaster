@@ -1,87 +1,79 @@
 # Load required libraries
-library(forecast)
-library(dplyr)
-library(tidyr)
-library(readr)
 library(shiny)
 library(ggplot2)
-library(zoo)  # For linear interpolation
+library(dplyr)
+library(readr)
 
-# Set the dataset folder path
+# Set dataset path
 dataset_folder <- "C:/git/Energy-Consumption-Forecasting/datasets"
-feature_engineered_path <- file.path(dataset_folder, "feature_engineered_energy_data.csv")
+merged_data_path <- file.path(dataset_folder, "merged_energy_data.csv")
 
-# Read the feature-engineered dataset
-energy_data <- read_csv(feature_engineered_path, show_col_types = FALSE)
+# Read dataset
+merged_data <- read_csv(merged_data_path, show_col_types = FALSE)
 
-# Identify the correct energy consumption column dynamically
-energy_col <- "primary_energy_consumption"
+# Extract unique country names
+country_list <- unique(merged_data$country)
 
-# Ensure 'year' is numeric for time series modeling
-energy_data$year <- as.numeric(energy_data$year)
+# Define available energy types for trends visualization
+energy_types <- c("primary_energy_consumption", "fossil_fuel_consumption", 
+                  "renewables_consumption", "oil_consumption", "nuclear_consumption")
 
-# Handle missing values using linear interpolation or mean imputation
-energy_data$primary_energy_consumption <- energy_data %>%
-  group_by(country) %>%
-  mutate(
-    primary_energy_consumption = if (all(is.na(primary_energy_consumption))) {
-      # If all values are NA, impute with the mean for that country
-      mean_value <- mean(primary_energy_consumption, na.rm = TRUE)
-      primary_energy_consumption <- ifelse(is.na(primary_energy_consumption), mean_value, primary_energy_consumption)
-    } else {
-      # Otherwise, apply linear interpolation
-      primary_energy_consumption <- na.approx(primary_energy_consumption, rule = 2)
-    }
-  ) %>%
-  ungroup()
+# Select relevant correlation factors
+correlation_factors <- c("gdp", "population", "fossil_fuel_consumption", 
+                         "renewables_consumption", "energy_per_gdp", 
+                         "average_temperature")
 
-# Function to fit ARIMA model and forecast
-forecast_energy <- function(df, country, energy_col, forecast_years = 10) {
-  ts_data <- df %>% filter(country == !!country) %>% arrange(year)
-  
-  # Check for missing values in the time series data for the selected country
-  if (any(is.na(ts_data[[energy_col]]))) {
-    cat("Missing data detected for", country, "in", energy_col, "\n")
-    return(NULL)  # Return NULL if there is missing data
-  }
-  
-  # Create a time series object for energy consumption
-  ts_series <- ts(ts_data[[energy_col]], start = min(ts_data$year), frequency = 1)
-  
-  # Check if the time series has sufficient data points for ARIMA
-  if (length(ts_series) < 2) {
-    cat("Insufficient data for ARIMA model in", country, "\n")
-    return(NULL)  # Return NULL if not enough data points
-  }
-  
-  # Fit ARIMA model
-  arima_model <- auto.arima(ts_series)
-  arima_forecast <- forecast(arima_model, h = forecast_years)
-  
-  return(arima_forecast)
-}
+# Remove factors that do not exist in the dataset
+correlation_factors <- correlation_factors[correlation_factors %in% colnames(merged_data)]
 
-# Forecast for selected countries
-forecast_results <- list()
-countries <- unique(energy_data$country)
-for (country in countries) {
-  forecast_results[[country]] <- forecast_energy(energy_data, country, energy_col)
-}
-
-# Define UI for the app
+# Define UI for Shiny app
 ui <- fluidPage(
-  titlePanel("Energy Consumption Forecasting and Comparison"),
+  titlePanel("📊 Interactive Energy Consumption Analysis"),
   
   sidebarLayout(
     sidebarPanel(
-      selectInput("country1", "Select Country 1", choices = countries),
-      selectInput("country2", "Select Country 2", choices = countries),
-      selectInput("energy_type", "Select Energy Type", choices = c("Primary Energy Consumption", "Renewables Consumption"))
+      h3("🔹 Task 1.1: Energy Consumption Trends"),
+      selectInput("selected_country", "🌍 Select Primary Country:", choices = country_list, selected = "United States"),
+      selectInput("compare_country", "🔄 Compare with Another Country (Optional):", choices = c("None", country_list), selected = "None"),
+      selectInput("selected_energy", "⚡ Select Energy Type:", choices = energy_types, selected = "primary_energy_consumption"),
+      
+      hr(),
+      h3("🔹 Task 1.2: Correlation Analysis"),
+      selectInput("selected_var", "📌 Select a factor to compare with Energy Consumption:", choices = correlation_factors, selected = "gdp"),
+      textOutput("corr_value"),
+      
+      hr(),
+      h4("📈 Interpretation of Correlation Values:"),
+      p("• **Above 0.7 (or below -0.7):** Strong correlation (major impact)"),
+      p("• **Between 0.4 and 0.7 (or -0.4 to -0.7):** Moderate correlation"),
+      p("• **Below 0.4:** Weak or no significant relationship")
     ),
     
     mainPanel(
-      plotOutput("forecastPlot"),
-      textOutput("modelExplanation")
+      h3("📊 Energy Consumption Trends (Task 1.1)"),
+      plotOutput("trendPlot"),
+      
+      hr(),
+      
+      h3("📈 Energy Consumption Correlation Analysis (Task 1.2)"),
+      plotOutput("scatterPlot"),
+      
+      hr(),
+      
+      h3("📘 How Correlation is Calculated"),
+      p("The correlation coefficient (r) measures the strength and direction of a relationship between two variables. It is calculated using Pearson’s correlation formula:"),
+      
+      tags$pre("r = Σ [(Xi - X̄)(Yi - Ȳ)] / sqrt(Σ (Xi - X̄)² * Σ (Yi - Ȳ)²)"),
+      
+      p("Where:"),
+      p("• Xi, Yi = Individual data points for variables X and Y."),
+      p("• X̄, Ȳ = Mean of X and Y."),
+      p("• Σ = Summation across all observations."),
+      
+      p("Correlation values range from **-1 to +1**:"),
+      p("• **+1** → Perfect positive correlation (as X increases, Y increases)."),
+      p("• **0** → No correlation (X and Y are independent)."),
+      p("• **-1** → Perfect negative correlation (as X increases, Y decreases).")
     )
   )
 )
@@ -89,76 +81,86 @@ ui <- fluidPage(
 # Define server logic
 server <- function(input, output) {
   
-  # Reactive expression to get forecast data
-  forecast_data <- reactive({
-    country1_forecast <- forecast_results[[input$country1]]
-    country2_forecast <- forecast_results[[input$country2]]
+  # Task 1.1: Energy Consumption Trends Visualization (With Comparison)
+  output$trendPlot <- renderPlot({
     
-    if (is.null(country1_forecast) || is.null(country2_forecast)) {
-      return(NULL)  # Return NULL if forecasts are not available
+    # Filter dataset for selected country
+    country_data <- merged_data %>%
+      filter(country == input$selected_country & !is.na(.data[[input$selected_energy]])) %>%
+      arrange(year) %>%
+      mutate(Country = input$selected_country)  # Add identifier column
+    
+    # If a second country is selected, add it to the dataset
+    if (input$compare_country != "None") {
+      compare_data <- merged_data %>%
+        filter(country == input$compare_country & !is.na(.data[[input$selected_energy]])) %>%
+        arrange(year) %>%
+        mutate(Country = input$compare_country)  # Add identifier column
+      
+      # Combine both datasets
+      country_data <- bind_rows(country_data, compare_data)
     }
     
-    data1 <- data.frame(
-      Year = seq(2021, 2030),
-      Forecast = country1_forecast$mean,
-      Country = input$country1
-    )
-    
-    data2 <- data.frame(
-      Year = seq(2021, 2030),
-      Forecast = country2_forecast$mean,
-      Country = input$country2
-    )
-    
-    combined_data <- rbind(data1, data2)
-    return(combined_data)
-  })
-  
-  # Plot the forecast
-  output$forecastPlot <- renderPlot({
-    forecast_data <- forecast_data()
-    
-    # Check if forecast data is NULL or empty
-    if (is.null(forecast_data) || nrow(forecast_data) == 0) {
-      return(NULL)  # Return nothing if no valid forecast data
-    }
-    
-    # Remove rows with NA values in 'Forecast' column before plotting
-    forecast_data_clean <- forecast_data %>%
-      filter(!is.na(Forecast))
-    
-    # If after cleaning there's no data, show a message instead of plotting
-    if (nrow(forecast_data_clean) == 0) {
-      return(NULL)  # Return nothing if no clean data available
-    }
-    
-    # Create the plot
-    ggplot(forecast_data_clean, aes(x = Year, y = Forecast, color = Country)) +
-      geom_line() +
-      labs(title = paste("Energy Consumption Forecast (2021-2030)"),
-           x = "Year", y = input$energy_type) +
+    # Create time series plot with comparison
+    ggplot(country_data, aes(x = year, y = .data[[input$selected_energy]], color = Country)) +
+      geom_line(size = 1) +
+      geom_point(size = 2, alpha = 0.6) +
+      labs(title = paste("Energy Consumption Trends:", input$selected_energy),
+           x = "Year",
+           y = input$selected_energy,
+           color = "Country") +
       theme_minimal()
   })
   
-  # Display machine learning model explanation
-  output$modelExplanation <- renderText({
-    explanation <- paste(
-      "The following models were used to forecast energy consumption:\n\n",
-      "1. **ARIMA (AutoRegressive Integrated Moving Average):**\n",
-      "   ARIMA is a statistical method for time series forecasting. It captures trends, seasonality, and patterns in historical data, and predicts future values based on these patterns.\n",
-      "   The model combines three components:\n",
-      "   - **AR (AutoRegressive):** Uses past values to predict future values.\n",
-      "   - **I (Integrated):** Differencing to make the series stationary.\n",
-      "   - **MA (Moving Average):** Uses past forecast errors.\n\n",
-      "2. **Exponential Smoothing (ETS):**\n",
-      "   ETS is a forecasting method where the model assigns exponentially decreasing weights to past observations. More recent data points are given higher weights. The model adjusts for trends and seasonality.\n\n",
-      "These models help predict future energy consumption by learning from past patterns in the data, offering valuable insights for planning and forecasting future energy needs."
-    )
-    return(explanation)
+  # Task 1.2: Correlation Analysis Scatter Plot
+  output$scatterPlot <- renderPlot({
+    
+    # Ensure selected variable exists
+    if (input$selected_var %in% colnames(merged_data)) {
+      
+      # Remove NA values
+      clean_data <- merged_data %>%
+        filter(!is.na(primary_energy_consumption), !is.na(.data[[input$selected_var]]))
+      
+      # Scatter plot with regression line
+      ggplot(clean_data, aes_string(x = input$selected_var, y = "primary_energy_consumption")) +
+        geom_point(alpha = 0.5) +
+        geom_smooth(method = "lm", color = "blue") +
+        labs(title = paste("Energy Consumption vs", input$selected_var),
+             x = input$selected_var,
+             y = "Primary Energy Consumption (TWh)") +
+        theme_minimal()
+    }
+  })
+  
+  # Display correlation value with explanation
+  output$corr_value <- renderText({
+    if (input$selected_var %in% colnames(merged_data)) {
+      
+      clean_data <- merged_data %>%
+        filter(!is.na(primary_energy_consumption), !is.na(.data[[input$selected_var]]))
+      
+      corr_val <- cor(clean_data$primary_energy_consumption, clean_data[[input$selected_var]], use = "complete.obs")
+      
+      # Interpretation
+      if (corr_val > 0.7) {
+        interpretation <- "Strong positive correlation - The factor has a significant positive impact on energy consumption."
+      } else if (corr_val < -0.7) {
+        interpretation <- "Strong negative correlation - The factor significantly reduces energy consumption."
+      } else if (abs(corr_val) > 0.4) {
+        interpretation <- "Moderate correlation - The factor somewhat affects energy consumption."
+      } else {
+        interpretation <- "Weak or no correlation - This factor does not strongly impact energy consumption."
+      }
+      
+      paste("📊 Correlation:", round(corr_val, 3), "-", interpretation)
+      
+    }
   })
 }
 
-# Run the app
+# Run the application
 shinyApp(ui = ui, server = server)
+
 
 
