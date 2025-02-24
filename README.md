@@ -15,5 +15,4 @@ Granularity:
 
 -Focus on monthly or daily predictions based on available data.
 
-The datasets used will be linked here
-1. https://nyc3.digitaloceanspaces.com/owid-public/data/energy/owid-energy-data.csv
+
