@@ -15,12 +15,5 @@ Granularity:
 
 -Focus on monthly or daily predictions based on available data.
 
-The Target Countries for this project will be 
-1. United States: High energy consumption with detailed historical data.
-2. Germany: A leading renewable energy adopter.
-3. India: Rapidly growing energy demand.
-4. China: Largest energy consumer globally.
-5. Brazil: Unique renewable energy mix with hydropower dominance.
-
 The datasets used will be linked here
 1. https://nyc3.digitaloceanspaces.com/owid-public/data/energy/owid-energy-data.csv
