@@ -8,16 +8,16 @@ library(plotly)
 
 # Define UI for the Shiny App
 ui <- fluidPage(
-  titlePanel("ARIMA Energy Consumption Forecast (Improved RMSE)"),
+  titlePanel("ARIMA Energy Consumption Forecast (Performance Metrics)"),
   sidebarLayout(
     sidebarPanel(
-      # Country selection based solely on the feature-engineered dataset
+      # Country selection is based solely on the feature-engineered dataset.
       uiOutput("country_ui"),
       actionButton("runForecast", "Run Forecast")
     ),
     mainPanel(
       plotlyOutput("forecastPlot"),
-      verbatimTextOutput("rmseOutput"),
+      verbatimTextOutput("errorMetrics"),
       tableOutput("forecastTable")
     )
   )
@@ -29,7 +29,8 @@ server <- function(input, output, session) {
   dataset_folder <- "C:/git/Energy-Consumption-Forecasting/datasets"
   
   # Load only the feature-engineered dataset
-  feature_data <- read_csv(file.path(dataset_folder, "feature_engineered_energy_data.csv"), show_col_types = FALSE)
+  feature_data <- read_csv(file.path(dataset_folder, "feature_engineered_energy_data.csv"), 
+                           show_col_types = FALSE)
   
   # Dynamically determine the energy consumption column from the feature-engineered dataset.
   possible_energy_columns <- c("energy_consumption", "primary_energy_consumption", 
@@ -60,19 +61,21 @@ server <- function(input, output, session) {
     list(data = country_data, energy_col = energy_col)
   })
   
-  # Fit ARIMA with a Box–Cox transformation for improved RMSE.
+  # Fit ARIMA with a Box–Cox transformation, forecast the next 20 years,
+  # and compute error metrics.
   forecastResult <- reactive({
     req(forecastData())
     country_data <- forecastData()$data
     energy_col_local <- forecastData()$energy_col
     
     # Create a time series object from the energy consumption data.
-    ts_series <- ts(country_data[[energy_col_local]], start = min(country_data$year), frequency = 1)
+    ts_series <- ts(country_data[[energy_col_local]], 
+                    start = min(country_data$year), frequency = 1)
     
     # Determine optimal Box-Cox lambda (adjust if series has non-positive values)
     lambda <- BoxCox.lambda(ts_series)
     
-    # Fit ARIMA with an exhaustive search (disabling stepwise and approximation)
+    # Fit ARIMA (using an exhaustive search by disabling stepwise and approximation)
     arima_model <- auto.arima(ts_series, lambda = lambda, 
                               stepwise = FALSE, approximation = FALSE)
     
@@ -80,22 +83,38 @@ server <- function(input, output, session) {
     forecast_horizon <- 20
     forecast_result <- forecast(arima_model, h = forecast_horizon)
     
-    # Calculate RMSE on the fitted (training) data.
+    # Calculate error metrics on the fitted (training) data.
     fitted_values <- fitted(arima_model)
     rmse_value <- rmse(ts_series, fitted_values)
+    mape_value <- mape(ts_series, fitted_values)
+    mean_val <- mean(ts_series, na.rm = TRUE)
     
-    list(forecast = forecast_result, rmse = rmse_value, country_data = country_data, ts_series = ts_series, lambda = lambda)
+    list(forecast = forecast_result, rmse = rmse_value, mape = mape_value, 
+         mean_val = mean_val, country_data = country_data, ts_series = ts_series, lambda = lambda)
   })
   
-  # Display the RMSE and a warning if it is not below 1.
-  output$rmseOutput <- renderPrint({
+  # Display error metrics and check conditions:
+  #   - RMSE must be less than 10% of the mean energy consumption.
+  #   - MAPE must be below 15%.
+  output$errorMetrics <- renderPrint({
     req(forecastResult())
     rmse_val <- forecastResult()$rmse
+    mape_val <- forecastResult()$mape
+    mean_val <- forecastResult()$mean_val
+    
     cat("ARIMA Model RMSE:", rmse_val, "\n")
-    if (rmse_val >= 1) {
-      cat("Warning: RMSE is not below 1. Consider further tuning or checking data quality.\n")
+    cat("Mean Energy Consumption:", mean_val, "\n")
+    if(rmse_val < 0.1 * mean_val) {
+      cat("RMSE condition met: RMSE is below 10% of the mean.\n")
     } else {
-      cat("RMSE requirement met: RMSE is below 1.\n")
+      cat("Warning: RMSE condition NOT met: RMSE is above 10% of the mean.\n")
+    }
+    
+    cat("ARIMA Model MAPE:", mape_val * 100, "%\n")
+    if(mape_val < 0.15) {
+      cat("MAPE condition met: MAPE is below 15%.\n")
+    } else {
+      cat("Warning: MAPE condition NOT met: MAPE is above 15%.\n")
     }
   })
   
@@ -113,8 +132,9 @@ server <- function(input, output, session) {
       Energy = country_data[[energy_col_local]]
     )
     
-    # Create forecast data frame.
-    forecast_years <- seq(max(country_data$year) + 1, max(country_data$year) + length(fc$mean))
+    # Create a forecast data frame.
+    forecast_years <- seq(max(country_data$year) + 1, 
+                          max(country_data$year) + length(fc$mean))
     forecast_df <- data.frame(
       Year = forecast_years,
       Forecast = as.numeric(fc$mean),
@@ -126,9 +146,10 @@ server <- function(input, output, session) {
     
     # Build the interactive Plotly plot.
     p <- plot_ly() %>%
-      add_lines(data = actual_df, x = ~Year, y = ~Energy, name = "Actual", line = list(color = "blue")) %>%
-      add_lines(data = forecast_df, x = ~Year, y = ~Forecast, name = "Forecast",
-                line = list(color = "red", dash = "dash")) %>%
+      add_lines(data = actual_df, x = ~Year, y = ~Energy, 
+                name = "Actual", line = list(color = "blue")) %>%
+      add_lines(data = forecast_df, x = ~Year, y = ~Forecast, 
+                name = "Forecast", line = list(color = "red", dash = "dash")) %>%
       add_ribbons(data = forecast_df, x = ~Year, ymin = ~Lower95, ymax = ~Upper95, 
                   name = "95% Confidence", fillcolor = "rgba(255, 0, 0, 0.2)",
                   line = list(color = "transparent")) %>%
@@ -147,7 +168,8 @@ server <- function(input, output, session) {
     req(forecastResult())
     res <- forecastResult()
     fc <- res$forecast
-    forecast_years <- seq(max(res$country_data$year) + 1, max(res$country_data$year) + length(fc$mean))
+    forecast_years <- seq(max(res$country_data$year) + 1, 
+                          max(res$country_data$year) + length(fc$mean))
     forecast_df <- data.frame(
       Year = forecast_years,
       Forecast = as.numeric(fc$mean),
@@ -162,5 +184,4 @@ server <- function(input, output, session) {
 
 # Run the Shiny App
 shinyApp(ui = ui, server = server)
-
 
