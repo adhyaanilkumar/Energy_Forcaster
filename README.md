@@ -9,6 +9,7 @@ Time Range: Forecast energy consumption for the next 12 months (e.g., April 2025
 Accuracy Goals:
 
 -Achieve an RMSE (Root Mean Squared Error) of less than 10% of the mean energy consumption values for each country.
+
 -Keep the MAPE (Mean Absolute Percentage Error) below 15% for all countries.
 
 Granularity:
