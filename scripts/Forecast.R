@@ -6,32 +6,12 @@ library(forecast)
 library(Metrics)
 library(plotly)
 
-# Function to impute missing energy consumption values:
-# 1. Linear interpolation by country using na.approx.
-# 2. Replace any remaining missing values with the country’s median.
-impute_energy <- function(df, energy_column) {
-  df <- df %>% 
-    group_by(country) %>% 
-    arrange(year) %>% 
-    mutate(!!sym(energy_column) := na.approx(get(energy_column), rule = 2, na.rm = FALSE)) %>% 
-    ungroup()
-  
-  df <- df %>% 
-    group_by(country) %>% 
-    mutate(!!sym(energy_column) := ifelse(is.na(get(energy_column)),
-                                          median(get(energy_column), na.rm = TRUE),
-                                          get(energy_column))) %>% 
-    ungroup()
-  return(df)
-}
-
 # Define UI for the Shiny App
 ui <- fluidPage(
   titlePanel("ARIMA Energy Consumption Forecast (Improved RMSE)"),
   sidebarLayout(
     sidebarPanel(
-      selectInput("dataset", "Select Dataset:", 
-                  choices = c("Merged Data", "Feature Engineered Data")),
+      # Country selection based solely on the feature-engineered dataset
       uiOutput("country_ui"),
       actionButton("runForecast", "Run Forecast")
     ),
@@ -48,11 +28,10 @@ server <- function(input, output, session) {
   # Set the dataset folder path (modify if needed)
   dataset_folder <- "C:/git/Energy-Consumption-Forecasting/datasets"
   
-  # Load both datasets at startup
-  merged_data <- read_csv(file.path(dataset_folder, "merged_energy_data.csv"), show_col_types = FALSE)
+  # Load only the feature-engineered dataset
   feature_data <- read_csv(file.path(dataset_folder, "feature_engineered_energy_data.csv"), show_col_types = FALSE)
   
-  # Dynamically determine the energy consumption column from the feature engineered dataset.
+  # Dynamically determine the energy consumption column from the feature-engineered dataset.
   possible_energy_columns <- c("energy_consumption", "primary_energy_consumption", 
                                "total_energy_consumption", "electricity_demand")
   energy_col <- intersect(possible_energy_columns, colnames(feature_data))
@@ -63,20 +42,19 @@ server <- function(input, output, session) {
     cat("Using column:", energy_col, "for energy consumption.\n")
   }
   
-  # Update the country selection input based on the chosen dataset.
+  # Update the country selection input based on the feature-engineered dataset.
   output$country_ui <- renderUI({
-    df <- if (input$dataset == "Merged Data") merged_data else feature_data
-    df <- impute_energy(df, energy_col)
+    # Remove rows with missing energy consumption values.
+    df <- feature_data %>% filter(!is.na(.data[[energy_col]]))
     countries <- unique(df$country)
     selectInput("country", "Select Country:", choices = countries)
   })
   
   # Process data when "Run Forecast" is clicked.
   forecastData <- eventReactive(input$runForecast, {
-    df <- if (input$dataset == "Merged Data") merged_data else feature_data
-    df <- impute_energy(df, energy_col)
+    df <- feature_data %>% filter(!is.na(.data[[energy_col]]))
     country_data <- df %>% filter(country == input$country) %>% arrange(year)
-    if(nrow(country_data) == 0) {
+    if (nrow(country_data) == 0) {
       stop(paste("No data available for", input$country))
     }
     list(data = country_data, energy_col = energy_col)
@@ -91,7 +69,7 @@ server <- function(input, output, session) {
     # Create a time series object from the energy consumption data.
     ts_series <- ts(country_data[[energy_col_local]], start = min(country_data$year), frequency = 1)
     
-    # Determine optimal Box-Cox lambda; note that if the series has non-positive values, adjust accordingly.
+    # Determine optimal Box-Cox lambda (adjust if series has non-positive values)
     lambda <- BoxCox.lambda(ts_series)
     
     # Fit ARIMA with an exhaustive search (disabling stepwise and approximation)
@@ -184,6 +162,5 @@ server <- function(input, output, session) {
 
 # Run the Shiny App
 shinyApp(ui = ui, server = server)
-
 
 
