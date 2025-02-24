@@ -12,8 +12,4 @@ Accuracy Goals:
 
 -Keep the MAPE (Mean Absolute Percentage Error) below 15% for all countries.
 
-Granularity:
-
--Focus on monthly or daily predictions based on available data.
-
 
