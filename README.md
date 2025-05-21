@@ -1,4 +1,4 @@
-# Energy-Consumption-Forecasting
+# Energy-Forcaster
 Predicting the energy consumptions of various countries using R programming
 Forecasting Goals
 
