@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  energy-forecaster:
+    build: .
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./datasets:/app/datasets
+      - ./templates:/app/templates
+      - ./static:/app/static
+    environment:
+      - FLASK_ENV=production
+      - FLASK_APP=app.py
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Optional: Add a reverse proxy with nginx
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - energy-forecaster
+    restart: unless-stopped
