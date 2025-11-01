@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Energy Forecasting{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="fas fa-tachometer-alt me-2"></i>Dashboard</h1>
+    <p>Overview of energy consumption forecasting system</p>
+</div>
+
+<div class="row">
+    <!-- Statistics Cards -->
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-muted mb-1">Total Countries</h6>
+                        <h3 id="totalCountries" class="mb-0">-</h3>
+                    </div>
+                    <i class="fas fa-globe fa-2x text-primary"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-muted mb-1">Models Available</h6>
+                        <h3 class="mb-0">4</h3>
+                    </div>
+                    <i class="fas fa-brain fa-2x text-primary"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-muted mb-1">Avg. RMSE</h6>
+                        <h3 id="avgRMSE" class="mb-0">-</h3>
+                    </div>
+                    <i class="fas fa-chart-line fa-2x text-primary"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-muted mb-1">Avg. MAPE</h6>
+                        <h3 id="avgMAPE" class="mb-0">-</h3>
+                    </div>
+                    <i class="fas fa-percentage fa-2x text-primary"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <!-- Global Trends Chart -->
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-chart-area me-2"></i>Global Energy Consumption Trends</h5>
+            </div>
+            <div class="card-body">
+                <div id="globalTrendsChart" class="chart-container">
+                    <div class="loading">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2">Loading global trends...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <!-- Top Energy Consumers -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-trophy me-2"></i>Top Energy Consumers</h5>
+            </div>
+            <div class="card-body">
+                <div id="topConsumersChart" class="chart-container">
+                    <div class="loading">
+                        <div class="spinner-border spinner-border-sm" role="status"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Model Performance Summary -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-cogs me-2"></i>Model Performance Summary</h5>
+            </div>
+            <div class="card-body">
+                <div id="modelPerformanceSummary" class="chart-container">
+                    <div class="loading">
+                        <div class="spinner-border spinner-border-sm" role="status"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Load dashboard data
+    async function loadDashboardData() {
+        try {
+            // Load countries count
+            const countriesResponse = await axios.get('/api/countries');
+            document.getElementById('totalCountries').textContent = countriesResponse.data.total || '-';
+
+            // Load global trends
+            const trendsResponse = await axios.get('/api/analytics/trends');
+            const trends = trendsResponse.data.global_trends;
+            
+            const trace = {
+                x: trends.map(d => d.year),
+                y: trends.map(d => d.sum),
+                type: 'scatter',
+                mode: 'lines+markers',
+                name: 'Global Energy Consumption',
+                line: { color: '#0066CC', width: 2 },
+                marker: { size: 5 }
+            };
+            
+            const layout = {
+                title: '',
+                xaxis: { title: 'Year', gridcolor: '#E9ECEF' },
+                yaxis: { title: 'Total Energy Consumption (TWh)', gridcolor: '#E9ECEF' },
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                template: 'plotly_white',
+                margin: { t: 20, b: 50, l: 60, r: 20 }
+            };
+            
+            Plotly.newPlot('globalTrendsChart', [trace], layout, {responsive: true});
+
+            // Load top consumers
+            const topConsumers = trendsResponse.data.top_consumers;
+            const topTrace = {
+                x: topConsumers.countries,
+                y: topConsumers.values,
+                type: 'bar',
+                marker: { color: '#0066CC' }
+            };
+            
+            const topLayout = {
+                title: '',
+                xaxis: { title: '', gridcolor: '#E9ECEF' },
+                yaxis: { title: 'Energy Consumption (TWh)', gridcolor: '#E9ECEF' },
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                template: 'plotly_white',
+                margin: { t: 20, b: 50, l: 60, r: 20 }
+            };
+            
+            Plotly.newPlot('topConsumersChart', [topTrace], topLayout, {responsive: true});
+
+            // Load model performance
+            const modelResponse = await axios.get('/api/models/performance');
+            const modelData = modelResponse.data.model_performance;
+            
+            if (modelData && modelData.length > 0) {
+                // Calculate averages
+                let totalRMSE = 0, totalMAPE = 0, count = 0;
+                modelData.forEach(m => {
+                    if (m.RMSE_mean) totalRMSE += m.RMSE_mean;
+                    if (m.MAPE_mean) totalMAPE += m.MAPE_mean;
+                    count++;
+                });
+                
+                document.getElementById('avgRMSE').textContent = count > 0 ? (totalRMSE / count).toFixed(2) : '-';
+                document.getElementById('avgMAPE').textContent = count > 0 ? (totalMAPE / count).toFixed(2) + '%' : '-';
+
+                // Model performance chart
+                const modelNames = modelData.map(m => m.model);
+                const modelRMSE = modelData.map(m => m.RMSE_mean || 0);
+                
+                const modelTrace = {
+                    x: modelNames,
+                    y: modelRMSE,
+                    type: 'bar',
+                    marker: { color: '#0066CC' }
+                };
+                
+                const modelLayout = {
+                    title: '',
+                    xaxis: { title: 'Model', gridcolor: '#E9ECEF' },
+                    yaxis: { title: 'Average RMSE', gridcolor: '#E9ECEF' },
+                    plot_bgcolor: 'rgba(0,0,0,0)',
+                    paper_bgcolor: 'rgba(0,0,0,0)',
+                    template: 'plotly_white',
+                    margin: { t: 20, b: 50, l: 60, r: 20 }
+                };
+                
+                Plotly.newPlot('modelPerformanceSummary', [modelTrace], modelLayout, {responsive: true});
+            }
+
+        } catch (error) {
+            console.error('Error loading dashboard data:', error);
+        }
+    }
+
+    // Load data on page load
+    document.addEventListener('DOMContentLoaded', loadDashboardData);
+</script>
+{% endblock %}

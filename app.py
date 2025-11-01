@@ -199,7 +199,27 @@ def fit_ets_robust(y_pos):
 @app.route('/')
 def index():
     """Serve the main dashboard"""
-    return render_template('index.html')
+    return render_template('dashboard.html')
+
+@app.route('/forecast')
+def forecast():
+    """Serve the forecasting page"""
+    return render_template('forecast.html')
+
+@app.route('/analytics')
+def analytics():
+    """Serve the analytics page"""
+    return render_template('analytics.html')
+
+@app.route('/models')
+def models():
+    """Serve the model performance page"""
+    return render_template('models.html')
+
+@app.route('/api')
+def api_docs():
+    """Serve the API documentation page"""
+    return render_template('api.html')
 
 @app.route('/api/health')
 def health_check():
