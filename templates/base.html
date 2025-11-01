@@ -199,6 +199,13 @@
             border-radius: 8px;
             padding: 15px;
             margin-bottom: 20px;
+            min-height: 500px;
+            height: 500px;
+        }
+
+        .chart-container-large {
+            min-height: 600px;
+            height: 600px;
         }
 
         /* Responsive */
@@ -239,6 +246,19 @@
 
         .table thead {
             background-color: var(--background-color);
+        }
+
+        /* Badges */
+        .badge {
+            padding: 4px 8px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            border-radius: 4px;
+        }
+
+        .badge-sm {
+            padding: 2px 6px;
+            font-size: 0.7rem;
         }
     </style>
     {% block extra_css %}{% endblock %}

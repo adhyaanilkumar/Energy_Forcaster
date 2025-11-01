@@ -130,8 +130,14 @@
             // Model comparison chart
             if (modelData && modelData.length > 0) {
                 const models = modelData.map(m => m.model);
-                const avgRMSE = modelData.map(m => m.RMSE_mean || 0);
-                const avgMAPE = modelData.map(m => m.MAPE_mean || 0);
+                const avgRMSE = modelData.map(m => {
+                    const val = m.RMSE_mean;
+                    return (val != null && !isNaN(val) && isFinite(val)) ? val : 0;
+                });
+                const avgMAPE = modelData.map(m => {
+                    const val = m.MAPE_mean;
+                    return (val != null && !isNaN(val) && isFinite(val) && val <= 1000) ? val : 0;
+                });
 
                 const rmseTrace = {
                     x: models,
@@ -159,10 +165,19 @@
                     paper_bgcolor: 'rgba(0,0,0,0)',
                     template: 'plotly_white',
                     margin: { t: 20, b: 50, l: 60, r: 60 },
-                    barmode: 'group'
+                    barmode: 'group',
+                    height: 500
                 };
 
-                Plotly.newPlot('modelComparisonChart', [rmseTrace, mapeTrace], comparisonLayout, {responsive: true});
+                const comparisonConfig = {
+                    responsive: true,
+                    displayModeBar: true,
+                    modeBarButtonsToRemove: [],
+                    displaylogo: false
+                };
+
+                document.getElementById('modelComparisonChart').innerHTML = '';
+                Plotly.newPlot('modelComparisonChart', [rmseTrace, mapeTrace], comparisonLayout, comparisonConfig);
 
                 // Best models chart
                 const bestLabels = Object.keys(bestCounts);
@@ -180,10 +195,19 @@
                     plot_bgcolor: 'rgba(0,0,0,0)',
                     paper_bgcolor: 'rgba(0,0,0,0)',
                     template: 'plotly_white',
-                    margin: { t: 20, b: 20, l: 20, r: 20 }
+                    margin: { t: 20, b: 20, l: 20, r: 20 },
+                    height: 450
                 };
 
-                Plotly.newPlot('bestModelsChart', [bestTrace], bestLayout, {responsive: true});
+                const bestConfig = {
+                    responsive: true,
+                    displayModeBar: true,
+                    modeBarButtonsToRemove: [],
+                    displaylogo: false
+                };
+
+                document.getElementById('bestModelsChart').innerHTML = '';
+                Plotly.newPlot('bestModelsChart', [bestTrace], bestLayout, bestConfig);
 
                 // Performance statistics table
                 const tbody = document.getElementById('modelStatsBody');
@@ -191,12 +215,17 @@
                 
                 modelData.forEach(model => {
                     const row = document.createElement('tr');
+                    const rmseMean = (model.RMSE_mean != null && !isNaN(model.RMSE_mean) && isFinite(model.RMSE_mean)) ? model.RMSE_mean : 0;
+                    const rmseMedian = (model.RMSE_median != null && !isNaN(model.RMSE_median) && isFinite(model.RMSE_median)) ? model.RMSE_median : 0;
+                    const mapeMean = (model.MAPE_mean != null && !isNaN(model.MAPE_mean) && isFinite(model.MAPE_mean) && model.MAPE_mean <= 1000) ? model.MAPE_mean : 0;
+                    const mapeMedian = (model.MAPE_median != null && !isNaN(model.MAPE_median) && isFinite(model.MAPE_median) && model.MAPE_median <= 1000) ? model.MAPE_median : 0;
+                    
                     row.innerHTML = `
                         <td><strong>${model.model}</strong></td>
-                        <td>${(model.RMSE_mean || 0).toFixed(2)}</td>
-                        <td>${(model.RMSE_median || 0).toFixed(2)}</td>
-                        <td>${(model.MAPE_mean || 0).toFixed(2)}%</td>
-                        <td>${(model.MAPE_median || 0).toFixed(2)}%</td>
+                        <td>${rmseMean.toFixed(2)}</td>
+                        <td>${rmseMedian.toFixed(2)}</td>
+                        <td>${mapeMean.toFixed(2)}%</td>
+                        <td>${mapeMedian.toFixed(2)}%</td>
                     `;
                     tbody.appendChild(row);
                 });
@@ -249,11 +278,20 @@
                     paper_bgcolor: 'rgba(0,0,0,0)',
                     template: 'plotly_white',
                     margin: { t: 60, b: 50, l: 60, r: 60 },
-                    barmode: 'group'
+                    barmode: 'group',
+                    height: 500
+                };
+
+                const countryConfig = {
+                    responsive: true,
+                    displayModeBar: true,
+                    modeBarButtonsToRemove: [],
+                    displaylogo: false
                 };
 
                 document.getElementById('countryPerformanceChart').style.display = 'block';
-                Plotly.newPlot('countryPerformanceChart', [rmseTrace, mapeTrace], layout, {responsive: true});
+                document.getElementById('countryPerformanceChart').innerHTML = '';
+                Plotly.newPlot('countryPerformanceChart', [rmseTrace, mapeTrace], layout, countryConfig);
             } else {
                 document.getElementById('countryPerformanceChart').innerHTML = '<p class="text-muted">No performance data available for this country.</p>';
                 document.getElementById('countryPerformanceChart').style.display = 'block';

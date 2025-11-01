@@ -108,10 +108,19 @@
                 plot_bgcolor: 'rgba(0,0,0,0)',
                 paper_bgcolor: 'rgba(0,0,0,0)',
                 template: 'plotly_white',
-                margin: { t: 20, b: 50, l: 60, r: 20 }
+                margin: { t: 20, b: 50, l: 60, r: 20 },
+                height: 450
             };
             
-            Plotly.newPlot('correlationChart', [corrTrace], corrLayout, {responsive: true});
+            const corrConfig = {
+                responsive: true,
+                displayModeBar: true,
+                modeBarButtonsToRemove: [],
+                displaylogo: false
+            };
+            
+            document.getElementById('correlationChart').innerHTML = '';
+            Plotly.newPlot('correlationChart', [corrTrace], corrLayout, corrConfig);
 
             // Load global trends
             const trendsResponse = await axios.get('/api/analytics/trends');
@@ -134,10 +143,19 @@
                 plot_bgcolor: 'rgba(0,0,0,0)',
                 paper_bgcolor: 'rgba(0,0,0,0)',
                 template: 'plotly_white',
-                margin: { t: 20, b: 50, l: 60, r: 20 }
+                margin: { t: 20, b: 50, l: 60, r: 20 },
+                height: 450
             };
             
-            Plotly.newPlot('globalTrendsChart', [trendsTrace], trendsLayout, {responsive: true});
+            const trendsConfig = {
+                responsive: true,
+                displayModeBar: true,
+                modeBarButtonsToRemove: [],
+                displaylogo: false
+            };
+            
+            document.getElementById('globalTrendsChart').innerHTML = '';
+            Plotly.newPlot('globalTrendsChart', [trendsTrace], trendsLayout, trendsConfig);
 
             // Top consumers
             const topConsumers = trendsResponse.data.top_consumers;
@@ -155,10 +173,19 @@
                 plot_bgcolor: 'rgba(0,0,0,0)',
                 paper_bgcolor: 'rgba(0,0,0,0)',
                 template: 'plotly_white',
-                margin: { t: 20, b: 50, l: 60, r: 20 }
+                margin: { t: 20, b: 50, l: 60, r: 20 },
+                height: 450
             };
             
-            Plotly.newPlot('topConsumersChart', [topTrace], topLayout, {responsive: true});
+            const topConfig = {
+                responsive: true,
+                displayModeBar: true,
+                modeBarButtonsToRemove: [],
+                displaylogo: false
+            };
+            
+            document.getElementById('topConsumersChart').innerHTML = '';
+            Plotly.newPlot('topConsumersChart', [topTrace], topLayout, topConfig);
 
             // Energy distribution (pie chart placeholder)
             const distData = [
@@ -177,10 +204,19 @@
                 plot_bgcolor: 'rgba(0,0,0,0)',
                 paper_bgcolor: 'rgba(0,0,0,0)',
                 template: 'plotly_white',
-                margin: { t: 20, b: 20, l: 20, r: 20 }
+                margin: { t: 20, b: 20, l: 20, r: 20 },
+                height: 450
             };
             
-            Plotly.newPlot('energyDistributionChart', [distTrace], distLayout, {responsive: true});
+            const distConfig = {
+                responsive: true,
+                displayModeBar: true,
+                modeBarButtonsToRemove: [],
+                displaylogo: false
+            };
+            
+            document.getElementById('energyDistributionChart').innerHTML = '';
+            Plotly.newPlot('energyDistributionChart', [distTrace], distLayout, distConfig);
 
         } catch (error) {
             console.error('Error loading analytics:', error);

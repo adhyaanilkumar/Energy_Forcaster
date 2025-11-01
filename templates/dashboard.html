@@ -154,10 +154,27 @@
                 plot_bgcolor: 'rgba(0,0,0,0)',
                 paper_bgcolor: 'rgba(0,0,0,0)',
                 template: 'plotly_white',
-                margin: { t: 20, b: 50, l: 60, r: 20 }
+                margin: { t: 20, b: 50, l: 60, r: 20 },
+                height: 500
             };
             
-            Plotly.newPlot('globalTrendsChart', [trace], layout, {responsive: true});
+            const config = {
+                responsive: true,
+                displayModeBar: true,
+                modeBarButtonsToRemove: [],
+                displaylogo: false,
+                toImageButtonOptions: {
+                    format: 'png',
+                    filename: 'global_trends',
+                    height: 500,
+                    width: 1200,
+                    scale: 1
+                }
+            };
+            
+            // Clear loading spinner
+            document.getElementById('globalTrendsChart').innerHTML = '';
+            Plotly.newPlot('globalTrendsChart', [trace], layout, config);
 
             // Load top consumers
             const topConsumers = trendsResponse.data.top_consumers;
@@ -175,49 +192,91 @@
                 plot_bgcolor: 'rgba(0,0,0,0)',
                 paper_bgcolor: 'rgba(0,0,0,0)',
                 template: 'plotly_white',
-                margin: { t: 20, b: 50, l: 60, r: 20 }
+                margin: { t: 20, b: 50, l: 60, r: 20 },
+                height: 450
             };
             
-            Plotly.newPlot('topConsumersChart', [topTrace], topLayout, {responsive: true});
+            const topConfig = {
+                responsive: true,
+                displayModeBar: true,
+                modeBarButtonsToRemove: [],
+                displaylogo: false
+            };
+            
+            document.getElementById('topConsumersChart').innerHTML = '';
+            Plotly.newPlot('topConsumersChart', [topTrace], topLayout, topConfig);
 
             // Load model performance
             const modelResponse = await axios.get('/api/models/performance');
             const modelData = modelResponse.data.model_performance;
             
             if (modelData && modelData.length > 0) {
-                // Calculate averages
-                let totalRMSE = 0, totalMAPE = 0, count = 0;
+                // Calculate averages (filter out null/undefined values)
+                let totalRMSE = 0, totalMAPE = 0, countRMSE = 0, countMAPE = 0;
                 modelData.forEach(m => {
-                    if (m.RMSE_mean) totalRMSE += m.RMSE_mean;
-                    if (m.MAPE_mean) totalMAPE += m.MAPE_mean;
-                    count++;
+                    if (m.RMSE_mean != null && !isNaN(m.RMSE_mean) && isFinite(m.RMSE_mean)) {
+                        totalRMSE += m.RMSE_mean;
+                        countRMSE++;
+                    }
+                    if (m.MAPE_mean != null && !isNaN(m.MAPE_mean) && isFinite(m.MAPE_mean) && m.MAPE_mean <= 1000) {
+                        totalMAPE += m.MAPE_mean;
+                        countMAPE++;
+                    }
                 });
                 
-                document.getElementById('avgRMSE').textContent = count > 0 ? (totalRMSE / count).toFixed(2) : '-';
-                document.getElementById('avgMAPE').textContent = count > 0 ? (totalMAPE / count).toFixed(2) + '%' : '-';
+                document.getElementById('avgRMSE').textContent = countRMSE > 0 ? (totalRMSE / countRMSE).toFixed(2) : '-';
+                document.getElementById('avgMAPE').textContent = countMAPE > 0 ? (totalMAPE / countMAPE).toFixed(2) + '%' : '-';
 
-                // Model performance chart
+                // Model performance chart - filter out invalid values
                 const modelNames = modelData.map(m => m.model);
-                const modelRMSE = modelData.map(m => m.RMSE_mean || 0);
+                const modelRMSE = modelData.map(m => {
+                    const val = m.RMSE_mean;
+                    return (val != null && !isNaN(val) && isFinite(val)) ? val : 0;
+                });
+                const modelMAPE = modelData.map(m => {
+                    const val = m.MAPE_mean;
+                    return (val != null && !isNaN(val) && isFinite(val) && val <= 1000) ? val : 0;
+                });
                 
-                const modelTrace = {
+                const rmseTrace = {
                     x: modelNames,
                     y: modelRMSE,
                     type: 'bar',
+                    name: 'RMSE',
                     marker: { color: '#0066CC' }
+                };
+                
+                const mapeTrace = {
+                    x: modelNames,
+                    y: modelMAPE,
+                    type: 'bar',
+                    name: 'MAPE (%)',
+                    marker: { color: '#6C757D' },
+                    yaxis: 'y2'
                 };
                 
                 const modelLayout = {
                     title: '',
                     xaxis: { title: 'Model', gridcolor: '#E9ECEF' },
                     yaxis: { title: 'Average RMSE', gridcolor: '#E9ECEF' },
+                    yaxis2: { title: 'Average MAPE (%)', overlaying: 'y', side: 'right', gridcolor: '#E9ECEF' },
                     plot_bgcolor: 'rgba(0,0,0,0)',
                     paper_bgcolor: 'rgba(0,0,0,0)',
                     template: 'plotly_white',
-                    margin: { t: 20, b: 50, l: 60, r: 20 }
+                    margin: { t: 20, b: 50, l: 60, r: 60 },
+                    height: 450,
+                    barmode: 'group'
                 };
                 
-                Plotly.newPlot('modelPerformanceSummary', [modelTrace], modelLayout, {responsive: true});
+                const modelConfig = {
+                    responsive: true,
+                    displayModeBar: true,
+                    modeBarButtonsToRemove: [],
+                    displaylogo: false
+                };
+                
+                document.getElementById('modelPerformanceSummary').innerHTML = '';
+                Plotly.newPlot('modelPerformanceSummary', [rmseTrace, mapeTrace], modelLayout, modelConfig);
             }
 
         } catch (error) {

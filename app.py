@@ -446,8 +446,20 @@ def get_model_performance():
     if model_results.empty:
         return jsonify({"error": "No model results available"}), 404
     
+    # Clean the data: filter out extreme MAPE values (>1000%) and NaN/Inf values
+    # MAPE > 1000% indicates data quality issues or near-zero actual values
+    cleaned_results = model_results.copy()
+    cleaned_results['MAPE'] = pd.to_numeric(cleaned_results['MAPE'], errors='coerce')
+    cleaned_results['RMSE'] = pd.to_numeric(cleaned_results['RMSE'], errors='coerce')
+    
+    # Filter out unreasonable MAPE values (keep only MAPE <= 1000%)
+    cleaned_results = cleaned_results[
+        (cleaned_results['MAPE'] <= 1000) | 
+        (cleaned_results['MAPE'].isna())
+    ].copy()
+    
     # Aggregate performance by model
-    model_stats = model_results.groupby('model').agg({
+    model_stats = cleaned_results.groupby('model').agg({
         'RMSE': ['mean', 'median', 'std'],
         'MAPE': ['mean', 'median', 'std']
     }).round(3)
@@ -456,13 +468,17 @@ def get_model_performance():
     model_stats.columns = ['_'.join(col).strip() for col in model_stats.columns]
     model_stats = model_stats.reset_index()
     
+    # Replace any remaining NaN/Inf values with None for JSON serialization
+    model_stats = model_stats.replace([np.inf, -np.inf, np.nan], None)
+    
     # Get best model summary
     best_model_counts = best_models['best_model_by_RMSE'].value_counts().to_dict()
     
     return jsonify({
         "model_performance": model_stats.to_dict('records'),
         "best_model_counts": best_model_counts,
-        "total_countries": len(best_models)
+        "total_countries": len(best_models),
+        "note": "MAPE values > 1000% have been filtered out as they indicate data quality issues"
     })
 
 @app.route('/api/models/performance/<country_name>')
@@ -473,9 +489,17 @@ def get_country_model_performance(country_name):
     if model_results.empty:
         return jsonify({"error": "No model results available"}), 404
     
-    country_results = model_results[model_results['country'] == country_name]
+    country_results = model_results[model_results['country'] == country_name].copy()
     if country_results.empty:
         return jsonify({"error": f"No results found for country '{country_name}'"}), 404
+    
+    # Clean MAPE values: cap at 1000% for display
+    country_results['MAPE'] = pd.to_numeric(country_results['MAPE'], errors='coerce')
+    country_results['RMSE'] = pd.to_numeric(country_results['RMSE'], errors='coerce')
+    
+    # Cap MAPE at 1000% for unreasonable values
+    country_results.loc[country_results['MAPE'] > 1000, 'MAPE'] = 1000
+    country_results = country_results.replace([np.inf, -np.inf, np.nan], None)
     
     return jsonify({
         "country": country_name,
